@@ -9,7 +9,8 @@ async function setupDB(){
         DROP TABLE IF EXISTS planets;
         CREATE TABLE planets(
         id SERIAL NOT NULL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL
+        name VARCHAR(255) NOT NULL,
+        image TEXT
         )
         `)
     await db.none(`INSERT INTO planets (name) VALUES ('Mercury')`)
@@ -19,20 +20,20 @@ async function setupDB(){
     console.log(planets2);
 }
 
-// setupDB()
+setupDB()
 
 
-planetSchema = Joi.object({
-    id: Joi.number(),
-    name: Joi.string().alphanum()   
-})
+planetSchema = Joi.string().alphanum()
+// object({
+//     name: Joi.string().alphanum()   
+// })
 
 const mainController = {
     home: async (req, res)=> {
         res.status(200).send('Hello, World!');
     },
     getPlanets: async (req, res) => {
-        const planetList = await db.many(`SELECT * FROM planets`)
+        const planetList = await db.many(`SELECT * FROM planets ORDER BY id`)
         res.status(200).json(planetList);
     },
     getPlanetById: async (req, res) => {
@@ -43,44 +44,67 @@ const mainController = {
     error: async(req,res)=>{
         throw new Error("Async error")
     },
-    createPlanet: (req, res) => {
-        console.log(req.body);
+    createPlanet: async(req, res) => {
+        // console.log(req.body);
         const { name } = req.body
-        const  id  = planets.length+1
+        // const  id  = planets.length+1
 
-        const newPlanet = {id, name} 
-        const validation = planetSchema.validate(newPlanet)
+        // const newPlanet = {id, name} 
+        const validation = planetSchema.validate(name)
         if(validation.error){
             res.status(400).json(validation.error.details[0].message)
             return 
         }
-        planets = [...planets, newPlanet]
-        console.log(planets); 
+        await db.none(`INSERT INTO planets (name) VALUES ($1)`, name)
+        const planetList = await db.many(`SELECT * FROM planets ORDER BY id`)
+        // planets = [...planets, newPlanet]
+        // console.log(planets); 
         
-        res.status(201).json(planets)
+        res.status(201).json(planetList)
     },
-    updatePlanet: (req, res) => {
+    updatePlanet: async (req, res) => {
         const { id } = req.params;
         const { name } = req.body;
         // const changePlanet = planets.find(planet => planet.id === Number(id));
 
-        planets.map((planet) =>{
-            if(planet.id === Number(id)){
-                planet.name = name
-            }
-            return planet;
-        })
+        const validation = planetSchema.validate(name)
+        if(validation.error){
+            res.status(400).json(validation.error.details[0].message)
+            return 
+        }
+        
+        await db.none(`UPDATE planets SET name = $2 WHERE id = $1`, [Number(id), name])
+        // planets.map((planet) =>{
+        //     if(planet.id === Number(id)){
+        //         planet.name = name
+        //     }
+        //     return planet;
+        // })
         // changePlanet.name = name;
     
-        res.status(200).json(planets)
+        const planetList = await db.many(`SELECT * FROM planets ORDER BY id`)
+        res.status(200).json(planetList)
     },
-    deletePlanet: (req, res) =>  {
+    deletePlanet: async(req, res) =>  {
         const { id } = req.params;
-        const newPlanetsArray = planets.filter(planet => {
-            return planet.id != Number(id)
-        })
+        // const newPlanetsArray = planets.filter(planet => {
+        //     return planet.id != Number(id)
+        // })
+
+        await db.none(`DELETE FROM planets WHERE id=$1`, Number(id))
         
-        res.status(200).json({msg: "success", newPlanetsArray})
+        const planetList = await db.many(`SELECT * FROM planets ORDER BY id`)
+        res.status(200).json(planetList)
+    },
+    addPlanetImage: async (req, res) =>{
+        const { id } = req.params;
+        console.log(req);
+        res.send('ok')
+        
+        // await db.none(`UPDATE planets SET image = $2 WHERE id = $1`, [Number(id), image]);
+
+        // const planetList = await db.many(`SELECT * FROM planets ORDER BY id`)
+        // res.status(200).json(planetList)
     }
 }
 
